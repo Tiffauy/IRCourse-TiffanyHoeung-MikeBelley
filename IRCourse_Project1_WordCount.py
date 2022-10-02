@@ -1,7 +1,7 @@
 # Get our post reader and open the xml file
 from post_parser_record import PostParserRecord
-post_reader = PostParserRecord("Posts.xml")
-#post_reader = PostParserRecord("Posts_Small.xml")
+#post_reader = PostParserRecord("data/Posts.xml")
+post_reader = PostParserRecord("data/Posts_Small.xml")
 
 # imports
 import nltk
@@ -23,7 +23,6 @@ def countPostWords():
 
     # For each question
     for answer_id in post_reader.map_questions:
-        print(str(answer_id) + " " + str(post_reader.map_questions[answer_id].answer_count))
         # Get text
         text = (post_reader.map_questions[answer_id].title + " " + post_reader.map_questions[answer_id].body)
         # Remove punctuations, Make lowercase
@@ -64,7 +63,7 @@ print("Finished processing!")
 # Sort dictionary
 sorted_word_dict = dict(sorted(word_dict.items(), key=lambda item: item[1], reverse=True))
 # Save results in a file for easier data usage:
-with open("P1_WordCount.csv", 'w', encoding ="utf-8") as f:
+with open("data/P1_WordCount.csv", 'w', encoding ="utf-8") as f:
     writer = csv.DictWriter(f, fieldnames=['Word', 'Count'], delimiter='\t')
     writer.writeheader()
     for word in word_dict:
@@ -77,7 +76,7 @@ for word, count in sorted_word_dict.items():
     if word not in stopwords.words('english'):
         word_dict_stopwords[word] = count
 
-with open("P1_WordCount_StopWords.csv", 'w', encoding ="utf-8") as f:
+with open("data/P1_WordCount_StopWords.csv", 'w', encoding ="utf-8") as f:
     writer = csv.DictWriter(f, fieldnames=['Word', 'Count'], delimiter='\t')
     writer.writeheader()
     for word in word_dict_stopwords:
