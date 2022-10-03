@@ -1,31 +1,42 @@
-# Get our post reader and open the xml file
+# Imports
 from codecs import utf_8_encode
 from post_parser_record import PostParserRecord
-post_reader = PostParserRecord("data/Posts.xml")
-#post_reader = PostParserRecord("data/Posts_Small.xml")
+post_reader = PostParserRecord("data/Posts.xml")            # Interchangeable with line 5
+#post_reader = PostParserRecord("data/Posts_Small.xml")     # Interchangeable with line 4
 
-# imports
 import nltk
+import time
 from nltk.corpus import stopwords
 from nltk.corpus.reader.tagged import word_tokenize
 import re, string
 import csv
+import sys
 import matplotlib.pyplot as plt
 from wordcloud import WordCloud
 #nltk.download('punkt')
 #nltk.download('stopwords')
+maxInt = sys.maxsize
+# Used to increase max csv file in case we are parsing from TSV
+while True:
+    # decrease the maxInt value by factor 10 
+    # as long as the OverflowError occurs.
+    try:
+        csv.field_size_limit(maxInt)
+        break
+    except OverflowError:
+        maxInt = int(maxInt/10)
 
-word_dict = {}
-
-def countPostWords():
+def createInvertedIndex():
     """
     This function counts all of the words in both the questions
     and answers. Keeps track of word count in word_dict.
     """
-    print("Beginning to process questions...")
+    print("Processing questions...")
 
     # For each question
     for answer_id in post_reader.map_questions:
+        if(post_reader.map_questions[answer_id].answer_count == 0):
+            print(answer_id)
         # Get text
         text = (post_reader.map_questions[answer_id].title + " " + post_reader.map_questions[answer_id].body)
         # Remove punctuations, Make lowercase
@@ -43,8 +54,7 @@ def countPostWords():
                 docs = {answer_id}
                 word_dict[word] = docs
     
-    print("Beginning to process answers...")
-
+    print("Processing answers...")
     # For each answer
     for answer_id in post_reader.map_just_answers:
         # Get text
@@ -65,6 +75,10 @@ def countPostWords():
                 word_dict[word] = docs
 
 def saveInvertedIndex():
+    """
+    This function saves word_dict into a TSV file and
+    saves it to /data.
+    """
     print("Saving data to tsv...")
     keys = ['Word', 'Documents']
 
@@ -75,71 +89,92 @@ def saveInvertedIndex():
             dict_writer.writerow({"Word": word, "Documents": word_dict[word]})
 
 def processTSV():
-    with open("data/InvertedIndex.tsv") as f:
+    """
+    processTSV() will open the TSV file at data/InvertedIndex.tsv
+    and parse it into word_dict as {words : {docs}}.
+    """
+    with open("data/InvertedIndex.tsv", encoding="utf-8") as f:
         tsv_file = csv.reader(f, delimiter="\t")
         next(tsv_file)
         for line in tsv_file:
-            word_dict[line[0]] = set(line[1].strip('}{').split(', '))
+            word_dict[line[0]] = {int(doc) for doc in (set(line[1].strip('}{').split(', ')))}
 
-# Ask user if they want to reprocess posts
+def processQueryWord(word):
+    """
+    This function looks for word in the word_dict
+    and applies the appropriate boolean_op to the
+    current results. Returns the product of the operation.
+    """
+    word = word.lower()
+    docs = word_dict.get(word)
+    # Check if the word exists in the dictionary; default to empty set if not
+    if(type(docs) != set):
+        docs = set()
+    # check what operation to do
+    if(boolean_op == -1): # FIRST WORD
+        return docs
+    elif(boolean_op == 0): # OR
+        return results | docs
+    elif(boolean_op == 1): # AND
+        return results & docs
+
+# START:
+word_dict = {}
 validInput = False
+
+# Ask user if they want to reprocess posts; alternative is read from TSV
 userInput = input("First time parsing the posts? (Y/N): ")
-while validInput == False:
-    if(userInput[0] == 'Y' or userInput[0] == 'y'):
-        countPostWords()
-        saveInvertedIndex()
+while validInput == False: 
+    if(userInput[0].upper() == 'Y'):
+        time_start = time.time()
+        createInvertedIndex()       # Generates inverted index from Posts.xml
+        time_end = time.time()
+        print(f'Processing posts took %.2f s' % (time_end - time_start))
+        saveInvertedIndex()         # Saves inverted index in TSV form
         validInput = True
-    elif(userInput[0] == 'N' or userInput[0] == 'n'):
-        processTSV()
+    elif(userInput[0].upper() == 'N'):
+        time_start = time.time()
+        processTSV()                # Creates the inverted index from the TSV
+        time_end = time.time()
+        print(f'Processing posts took %.2f s' % (time_end - time_start))
         validInput = True
     else:
         print("Invalid input. Input Y or N")
-        userInput = input("Regenerate Inverted Index? (Y/N): ")
+        userInput = input("First time parsing the posts? (Y/N): ")
 
 # At this point, we have inverted index from reading through the file or processing TSV
 # First we need to get our query from the user
 hasAnotherQuery = True
 while hasAnotherQuery:
-    userInput = input("Input your query: ")
+    userInput = input("Input your boolean query: ")
     parsed_query = userInput.split()
-    boolean_op = -1 # Used to keep track of OR and AND. 0 = OR, 1 = AND, -1 = No value atm
-    results = {}
+    boolean_op = -1         # Used to keep track of OR and AND. 0 = OR, 1 = AND, -1 = No value atm
+    results = [] 
+    time_start = time.time()
     for word in parsed_query:
-        if(word != "OR" and word != "AND"):
-            word = word.lower()
-            docs = word_dict.get(word)
-            if(boolean_op == -1): # FIRST WORD
-                results = docs
-            elif(boolean_op == 0): # OR
-                if(type(docs) == set):
-                    results = results | docs
-            elif(boolean_op == 1): # AND
-                if(type(docs) == set):
-                    results = results & docs
-                else:
-                    results = docs
-        elif(word == "OR"):
+        if(word.upper() != "OR" and word.upper() != "AND"):
+            results = processQueryWord(word)
+        elif(word.upper() == "OR"):
             boolean_op = 0
-        elif(word == "AND"):
+        elif(word.upper() == "AND"):
             boolean_op = 1
-    # if results is not a set, set it to an empty set; type will be NoneType
-    if(type(results) != set):
-        results = {}
-    results = sorted(list(results))
-
-    print("The top 50 results for your query are: ")
-    print(results[:50])
+    results = sorted(list(results)) # Get our documents and sort them
+    results = results[:50]
+    print(f"The top %d results for your query are: " % len(results))
+    print(results)
+    time_end = time.time()
+    print(f'Retrieving the index took %.2f ms' % ((time_end - time_start)*1000))
 
     # Ask user if they want another query
     userInput = input("Would you like to make another query? (Y/N): ")
     validInput = False
     while validInput == False:
-        if(userInput[0] == 'Y' or userInput[0] == 'y'):
+        if(userInput[0].upper() == 'Y'):
             hasAnotherQuery = True
             validInput = True
-        elif(userInput[0] == 'N' or userInput[0] == 'n'):
+        elif(userInput[0].upper() == 'N'):
             hasAnotherQuery = False
             validInput = True
         else:
             print("Invalid input. Input Y or N")
-            userInput = input("Regenerate Inverted Index? (Y/N): ")
+            userInput = input("Would you like to make another query? (Y/N): ")
