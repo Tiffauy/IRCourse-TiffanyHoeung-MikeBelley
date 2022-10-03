@@ -1,18 +1,17 @@
 # Imports
 from codecs import utf_8_encode
+from typing import Dict
 from post_parser_record import PostParserRecord
 post_reader = PostParserRecord("data/Posts.xml")            # Interchangeable with line 5
 #post_reader = PostParserRecord("data/Posts_Small.xml")     # Interchangeable with line 4
-
-import nltk
+import sys
+import csv
 import time
 from nltk.corpus import stopwords
 from nltk.corpus.reader.tagged import word_tokenize
 import re, string
-import csv
-import sys
-#nltk.download('punkt')
-#nltk.download('stopwords')
+from collections import Counter
+from itertools import islice
 maxInt = sys.maxsize
 # Used to increase max csv file in case we are parsing from TSV
 while True:
@@ -24,22 +23,13 @@ while True:
     except OverflowError:
         maxInt = int(maxInt/10)
 
-def timerStart(use):
-    if(use == 1):
-        time_start = time.time()
-
-def timerEnd(use):
-    if(use == 1):
-        time_end= time.time()
-        print(f'Time to evaluate took %.2f s' % (time_end - time_start))
-
 def createInvertedIndex():
     """
     This function counts all of the words in both the questions
-    and answers. Keeps track of word count in word_dict.
+    and answers. Keeps track of documents with their word counts
+    in a dictionary to their term. vocab : {doc:count, doc:count}
     """
     print("Processing questions...")
-
     # For each question
     for answer_id in post_reader.map_questions:
         # Get text
@@ -50,14 +40,17 @@ def createInvertedIndex():
         token_words = word_tokenize(token_words.translate(str.maketrans('', '', string.punctuation)))
         # Now go through all the words and add to the dictionary
         for word in token_words:
-            if word in word_dict:
-                docs = word_dict[word]
-                if answer_id not in docs:
-                    docs.add(answer_id)
-                word_dict[word] = docs
-            else:
-                docs = {answer_id}
-                word_dict[word] = docs
+            if word not in stopwords.words('english'):
+                if word in word_dict:
+                    docs = word_dict[word]
+                    if answer_id not in docs:
+                        docs.update({answer_id:1})
+                    else:
+                        docs[answer_id] = docs[answer_id]+1
+                    word_dict[word] = docs
+                else:
+                    docs = {answer_id:1}
+                    word_dict[word] = docs
     
     print("Processing answers...")
     # For each answer
@@ -70,14 +63,17 @@ def createInvertedIndex():
         token_words = word_tokenize(token_words.translate(str.maketrans('', '', string.punctuation)))
         # Now go through all the words and add to the dictionary
         for word in token_words:
-            if word in word_dict:
-                docs = word_dict[word]
-                if answer_id not in docs:
-                    docs.add(answer_id)
-                word_dict[word] = docs
-            else:
-                docs = {answer_id}
-                word_dict[word] = docs
+            if word not in stopwords.words('english'):
+                if word in word_dict:
+                    docs = word_dict[word]
+                    if answer_id not in docs:
+                        docs.update({answer_id:1})
+                    else:
+                        docs[answer_id] = docs[answer_id]+1
+                    word_dict[word] = docs
+                else:
+                    docs = {answer_id:1}
+                    word_dict[word] = docs
 
 def saveInvertedIndex():
     """
@@ -87,41 +83,38 @@ def saveInvertedIndex():
     print("Saving data to tsv...")
     keys = ['Word', 'Documents']
 
-    with open("data/InvertedIndex.tsv", "w", encoding="utf-8", newline='') as f:
+    with open("data/InvertedIndexCounts.tsv", "w", encoding="utf-8", newline='') as f:
         dict_writer = csv.DictWriter(f, keys, delimiter='\t')
         dict_writer.writeheader()
         for word in word_dict:
-            dict_writer.writerow({"Word": word, "Documents": word_dict[word]})
+            dict_writer.writerow({"Word": word, "Documents": str(word_dict[word])})
 
 def processTSV():
     """
     processTSV() will open the TSV file at data/InvertedIndex.tsv
     and parse it into word_dict as {words : {docs}}.
     """
-    with open("data/InvertedIndex.tsv", encoding="utf-8") as f:
+    with open("data/InvertedIndexCounts.tsv", encoding="utf-8") as f:
         tsv_file = csv.reader(f, delimiter="\t")
         next(tsv_file)
         for line in tsv_file:
-            word_dict[line[0]] = {int(doc) for doc in (set(line[1].strip('}{').split(', ')))}
+            word_dict[line[0]] = eval(line[1])
 
-def processQueryWord(word):
+def processQueryWord(word, results):
     """
-    This function looks for word in the word_dict
-    and applies the appropriate boolean_op to the
-    current results. Returns the product of the operation.
+    This function looks for word in the word_dict and combines
+    it with our current set of results, then removes any documents
+    that don't have both words.
     """
-    word = word.lower()
+    # First, combine the dictionaries for word & results
     docs = word_dict.get(word)
-    # Check if the word exists in the dictionary; default to empty set if not
-    if(type(docs) != set):
-        docs = set()
-    # check what operation to do
-    if(boolean_op == -1): # FIRST WORD
-        return docs
-    elif(boolean_op == 0): # OR
-        return results | docs
-    elif(boolean_op == 1): # AND
-        return results & docs
+    if(type(docs) == dict):
+        combined_dic = (Counter(results) + Counter(word_dict.get(word)))
+        combined_dic = {k: v for k, v in combined_dic.items() if k in results and k in word_dict.get(word)}
+        return dict(combined_dic)
+    else: # there are no documents for our word, return an empty dictionary
+        return dict()
+
 
 # START:
 word_dict = {}
@@ -132,7 +125,7 @@ userInput = input("First time parsing the posts? (Y/N): ")
 while validInput == False: 
     if(userInput[0].upper() == 'Y'):
         time_start = time.time()
-        createInvertedIndex()       # Generates inverted index from Posts.xml
+        createInvertedIndex()       # Generates inverted index with count from Posts.xml
         time_end = time.time()
         print(f'Processing posts took %.2f s' % (time_end - time_start))
         saveInvertedIndex()         # Saves inverted index in TSV form
@@ -147,28 +140,29 @@ while validInput == False:
         print("Invalid input. Input Y or N")
         userInput = input("First time parsing the posts? (Y/N): ")
 
-# At this point, we have inverted index from reading through the file or processing TSV
-# Then we need to get our query from the user
+# Get the query from the user
+vocab_to_doc = {} # Delete for final submission
 hasAnotherQuery = True
 while hasAnotherQuery:
-    userInput = input("Input your boolean query: ")
+    userInput = input("Input your query: ")
     parsed_query = userInput.split()
-    boolean_op = -1         # Used to keep track of OR and AND. 0 = OR, 1 = AND, -1 = No value atm
     results = [] 
     time_start = time.time()
     for word in parsed_query:
-        if(word.upper() != "OR" and word.upper() != "AND"):
-            results = processQueryWord(word)
-        elif(word.upper() == "OR"):
-            boolean_op = 0
-        elif(word.upper() == "AND"):
-            boolean_op = 1
-    results = sorted(list(results)) # Get our documents and sort them
-    results = results[:50]
+        word = word.lower()
+        if word == parsed_query[0]:
+            results = word_dict.get(word)
+            if(type(results) != dict): # There are no documents for the word ; return empty dic
+                results = dict()
+        else:
+            results = processQueryWord(word, results)
+    results = dict(islice(sorted(results.items(), key=lambda item: item[1], reverse=True), 50)) # Get our documents and sort them
     print(f"The top %d results for your query are: " % len(results))
     print(results)
     time_end = time.time()
     print(f'Retrieving the index took %.2f ms' % ((time_end - time_start)*1000))
+
+    vocab_to_doc[userInput] = list(results.keys())[:20] # Delete for final submission
 
     # Ask user if they want another query
     userInput = input("Would you like to make another query? (Y/N): ")
@@ -178,6 +172,9 @@ while hasAnotherQuery:
             hasAnotherQuery = True
             validInput = True
         elif(userInput[0].upper() == 'N'):
+            print("QUERY\t\tDOCUMENTS") # Delete for final submission
+            for query in vocab_to_doc: # Delete for final submission
+                print(str(query) + ": \t\t" + str(vocab_to_doc[query])) # Delete for final submission
             hasAnotherQuery = False
             validInput = True
         else:
