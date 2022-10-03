@@ -11,8 +11,6 @@ from nltk.corpus.reader.tagged import word_tokenize
 import re, string
 import csv
 import sys
-import matplotlib.pyplot as plt
-from wordcloud import WordCloud
 #nltk.download('punkt')
 #nltk.download('stopwords')
 maxInt = sys.maxsize
@@ -26,6 +24,15 @@ while True:
     except OverflowError:
         maxInt = int(maxInt/10)
 
+def timerStart(use):
+    if(use == 1):
+        time_start = time.time()
+
+def timerEnd(use):
+    if(use == 1):
+        time_end= time.time()
+        print(f'Time to evaluate took %.2f s' % (time_end - time_start))
+
 def createInvertedIndex():
     """
     This function counts all of the words in both the questions
@@ -35,8 +42,6 @@ def createInvertedIndex():
 
     # For each question
     for answer_id in post_reader.map_questions:
-        if(post_reader.map_questions[answer_id].answer_count == 0):
-            print(answer_id)
         # Get text
         text = (post_reader.map_questions[answer_id].title + " " + post_reader.map_questions[answer_id].body)
         # Remove punctuations, Make lowercase
@@ -143,7 +148,7 @@ while validInput == False:
         userInput = input("First time parsing the posts? (Y/N): ")
 
 # At this point, we have inverted index from reading through the file or processing TSV
-# First we need to get our query from the user
+# Then we need to get our query from the user
 hasAnotherQuery = True
 while hasAnotherQuery:
     userInput = input("Input your boolean query: ")
