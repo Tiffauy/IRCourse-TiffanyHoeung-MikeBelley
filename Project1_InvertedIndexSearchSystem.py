@@ -38,9 +38,10 @@ def createInvertedIndex():
         token_words = re.sub("<.*?>|\\n|&quot;", " ", text.lower())
         # Tokenize words into list
         token_words = word_tokenize(token_words.translate(str.maketrans('', '', string.punctuation)))
+        stop_words = stopwords.words('english')
         # Now go through all the words and add to the dictionary
         for word in token_words:
-            if word not in stopwords.words('english'):
+            if word not in stop_words:
                 if word in word_dict:
                     docs = word_dict[word]
                     if answer_id not in docs:
@@ -63,7 +64,7 @@ def createInvertedIndex():
         token_words = word_tokenize(token_words.translate(str.maketrans('', '', string.punctuation)))
         # Now go through all the words and add to the dictionary
         for word in token_words:
-            if word not in stopwords.words('english'):
+            if word not in stop_words:
                 if word in word_dict:
                     docs = word_dict[word]
                     if answer_id not in docs:
