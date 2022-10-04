@@ -38,7 +38,6 @@ def createInvertedIndex():
         token_words = re.sub("<.*?>|\\n|&quot;", " ", text.lower())
         # Tokenize words into list
         token_words = word_tokenize(token_words.translate(str.maketrans('', '', string.punctuation)))
-        stop_words = stopwords.words('english')
         # Now go through all the words and add to the dictionary
         for word in token_words:
             if word not in stop_words:
@@ -120,6 +119,7 @@ def processQueryWord(word, results):
 # START:
 word_dict = {}
 validInput = False
+stop_words = stopwords.words('english')
 
 # Ask user if they want to reprocess posts; alternative is read from TSV
 userInput = input("First time parsing the posts? (Y/N): ")
@@ -148,15 +148,18 @@ while hasAnotherQuery:
     userInput = input("Input your query: ")
     parsed_query = userInput.split()
     results = [] 
+    word_count = 0 # Keeps track of the number of terms we've pulled for
     time_start = time.time()
     for word in parsed_query:
-        word = word.lower()
-        if word == parsed_query[0]:
-            results = word_dict.get(word)
-            if(type(results) != dict): # There are no documents for the word ; return empty dic
-                results = dict()
-        else:
-            results = processQueryWord(word, results)
+        if word not in stop_words:
+            word = word.lower()
+            if word_count == 0: # If this is the first word
+                results = word_dict.get(word)
+                if(type(results) != dict): # There are no documents for the word ; return empty dic
+                    results = dict()
+            else:
+                results = processQueryWord(word, results)
+            word_count += 1
     results = dict(islice(sorted(results.items(), key=lambda item: item[1], reverse=True), 50)) # Get our documents and sort them
     print(f"The top %d results for your query are: " % len(results))
     print(results)
