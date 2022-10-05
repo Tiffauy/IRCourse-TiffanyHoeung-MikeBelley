@@ -1,7 +1,7 @@
 # Get our post reader and open the xml file
 from post_parser_record import PostParserRecord
-#post_reader = PostParserRecord("data/Posts.xml")
-post_reader = PostParserRecord("data/Posts_Small.xml")
+post_reader = PostParserRecord("data/Posts.xml")
+#post_reader = PostParserRecord("data/Posts_Small.xml")
 
 # imports
 import nltk
