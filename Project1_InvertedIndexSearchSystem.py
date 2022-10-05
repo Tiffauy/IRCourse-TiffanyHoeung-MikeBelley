@@ -115,6 +115,27 @@ def processQueryWord(word, results):
     else: # there are no documents for our word, return an empty dictionary
         return dict()
 
+def saveAsQrelResults(results_dict):
+    """
+    This function takes the results_dict, which consists of
+    query : {doc: freq} and saves it in Qrel results format.
+    """
+    print("Saving as qrel file...")
+    # query-id Q0 document-id rank score standard
+    str_start = "I00"
+    count = 1
+    with open("data/InvertedIndexQrelResults.txt", "w") as f:
+        for query in results_dict:
+            if count == 10:
+                str_start = "I0"
+            str_combine = str_start + str(count)
+            rank_count = 1
+            for doc in results_dict[query]:
+                f.write(str_combine + " Q0 " + str(doc) + " " + str(rank_count) + " " + str(results_dict[query][doc]) + " STANDARD\n")
+                rank_count += 1
+            count += 1
+
+
 
 # START:
 word_dict = {}
@@ -166,7 +187,8 @@ while hasAnotherQuery:
     time_end = time.time()
     print(f'Retrieving the index took %.2f ms' % ((time_end - time_start)*1000))
 
-    vocab_to_doc[userInput] = list(results.keys())[:20] # Delete for final submission
+    results = dict(islice(sorted(results.items(), key=lambda item: item[1], reverse=True), 10)) # Delete this
+    vocab_to_doc[userInput] = results.copy() # Delete for final submission
 
     # Ask user if they want another query
     userInput = input("Would you like to make another query? (Y/N): ")
@@ -176,9 +198,7 @@ while hasAnotherQuery:
             hasAnotherQuery = True
             validInput = True
         elif(userInput[0].upper() == 'N'):
-            print("QUERY\t\tDOCUMENTS") # Delete for final submission
-            for query in vocab_to_doc: # Delete for final submission
-                print(str(query) + ": \t\t" + str(vocab_to_doc[query])) # Delete for final submission
+            #saveAsQrelResults(vocab_to_doc) # Save the search results to a qrel results file
             hasAnotherQuery = False
             validInput = True
         else:
