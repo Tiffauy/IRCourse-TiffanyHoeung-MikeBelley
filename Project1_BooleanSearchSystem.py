@@ -119,9 +119,15 @@ def processQueryWord(word):
     elif(boolean_op == 1): # AND
         return results & docs
 
+def printResults(query, results):
+    print(f"The top %d results for the query \"%s\" are: " % (len(results), query))
+    for result in results:
+        print(result)
+
 # START:
 word_dict = {}
 validInput = False
+printTime = False
 
 # Ask user if they want to reprocess posts; alternative is read from TSV
 userInput = input("First time indexing the posts? (Y/N): ")
@@ -130,14 +136,16 @@ while validInput == False:
         time_start = time.time()
         createBooleanIndex()       # Generates inverted index from Posts.xml
         time_end = time.time()
-        print(f'Processing posts from Posts.xml took %.2f s' % (time_end - time_start))
+        if(printTime):
+            print(f'Processing posts from Posts.xml took %.2f s' % (time_end - time_start))
         saveInvertedIndex()         # Saves inverted index in TSV form
         validInput = True
     elif(userInput[0].upper() == 'N'):
         time_start = time.time()
         processTSV()                # Creates the inverted index from the TSV
         time_end = time.time()
-        print(f'Processing posts from TSV took %.2f s' % (time_end - time_start))
+        if(printTime):
+            print(f'Processing posts from TSV took %.2f s' % (time_end - time_start))
         validInput = True
     else:
         print("Invalid input. Input Y or N")
@@ -181,14 +189,14 @@ while hasAnotherQuery:
     # Check if we left bc invalid query
     if (invalid_query):
         continue
-
+    
+    time_end = time.time()
     # Sort results via doc id and only take first 50
     results = sorted(list(results))[:50]
-    time_end = time.time()
     # Print results:
-    print(f"The top %d results for your query are: " % len(results))
-    print(results)
-    print(f'Retrieving the index took %.2f ms' % ((time_end - time_start)*1000))
+    printResults(userInput, results)
+    if(printTime):
+        print(f'Retrieving the index took %.2f ms' % ((time_end - time_start)*1000))
 
     # Ask user if they want another query
     userInput = input("Would you like to make another query? (Y/N): ")

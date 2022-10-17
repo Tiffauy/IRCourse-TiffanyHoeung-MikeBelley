@@ -141,10 +141,16 @@ def saveAsQrelResults(results_dict):
                 rank_count += 1
             count += 1
 
+def printResults(query, results):
+    print(f"The top %d results for the query \"%s\" are: " % (len(results), query))
+    for result in results:
+        print(f"%d\t\t%d" % (result, results[result]))
+
 
 # START:
 word_dict = {}
 validInput = False
+printTime = False
 
 # Ask user if they want to reprocess posts; alternative is read from TSV
 userInput = input("First time indexing the posts? (Y/N): ")
@@ -153,14 +159,16 @@ while validInput == False:
         time_start = time.time()
         createInvertedIndex()       # Generates inverted index with count from Posts.xml
         time_end = time.time()
-        print(f'Processing posts from Posts.xml took %.2f s' % (time_end - time_start))
+        if(printTime):
+            print(f'Processing posts from Posts.xml took %.2f s' % (time_end - time_start))
         saveInvertedIndex()         # Saves inverted index in TSV form
         validInput = True
     elif(userInput[0].upper() == 'N'):
         time_start = time.time()
         processTSV()                # Creates the inverted index from the TSV
         time_end = time.time()
-        print(f'Processing posts from TSV took %.2f s' % (time_end - time_start))
+        if(printTime):
+            print(f'Processing posts from TSV took %.2f s' % (time_end - time_start))
         validInput = True
     else:
         print("Invalid input. Input Y or N")
@@ -187,11 +195,11 @@ while hasAnotherQuery:
             else:
                 results = processQueryWord(word, results)
             word_count += 1
-    results = dict(islice(sorted(results.items(), key=lambda item: item[1], reverse=True), 50)) # Get our documents and sort them
-    print(f"The top %d results for your query are: " % len(results))
-    print(results)
     time_end = time.time()
-    print(f'Retrieving the index took %.2f ms' % ((time_end - time_start)*1000))
+    results = dict(islice(sorted(results.items(), key=lambda item: item[1], reverse=True), 50)) # Get our documents and sort them
+    printResults(userInput, results)
+    if(printTime):
+        print(f'Retrieving the index took %.2f ms' % ((time_end - time_start)*1000))
 
     # Ask user if they want another query
     userInput = input("Would you like to make another query? (Y/N): ")
